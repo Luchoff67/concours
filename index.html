@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="d3.v6.min.js"></script>
+    <script src="leaflet.js"></script>
+    <link rel="stylesheet" href="leaflet.css" />
+    <title>Geovisualisation Dynamique</title>
+
+    <style>
+        @font-face {
+            font-family: 'Unistra A';
+            src: url('Style/UnistraA-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Unistra A', Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #bff1f2;
+        }
+
+        header {
+            background-color: #35abbd;
+            color: #fff;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .map-section {
+            display: flex;
+            margin: 10px 0;
+            height: 86vh;
+        }
+
+        .map-container {
+            flex: 3;
+            height: 100%;
+            background-color: #eee;
+            position: relative;
+        }
+
+        .panel {
+            padding: 15px;
+            background-color: #35abbd;
+            color: white;
+            overflow-y: auto;
+            width: 35%;
+        }
+        
+        .panel h1 {
+    margin-bottom: 10px; /* Réduit l'écart avec l'élément suivant */
+    font-size: 20px; /* Ajustez la taille si nécessaire */
+}
+        
+.chart-container {
+    margin-top: 10px; /* Réduction de l'espace entre le titre et le graphique */
+}
+
+
+        .right-panel {
+            order: 2;
+        }
+
+.chart-container {
+    margin-top: 1px;
+    width: 100%; /* Utilise toute la largeur disponible */
+    height: 300px; /* Hauteur ajustable */
+    font-family: 'Unistra A', Arial, sans-serif;
+    text-align: center;
+}
+
+        .legend {
+            background: white;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 18px;
+            color: #333;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+
+        .leaflet-popup-content-wrapper {
+            max-width: 300px !important;
+        }
+
+        .leaflet-popup-content {
+            font-size: 14px;
+        }
+
+        .leaflet-popup-tip {
+            background: #35abbd;
+        }
+
+    /* Ajustement du slider et des étiquettes */
+    #slider-container {
+        position: relative;
+        height: 70%; /* Ajustement de la hauteur pour descendre le slider */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 20px; /* Espace pour décaler vers le bas */
+    }
+
+    #yearSlider {
+        writing-mode: bt-lr;
+        -webkit-appearance: slider-vertical;
+        width: 8px;
+        height: 100%;
+        margin: 0 20px; /* Rapprocher les labels du slider */
+    }
+
+    .year-labels {
+        position: absolute;
+        right: 40px; /* Rapproche les labels du slider */
+        top: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 20px; /* Décalage vers le bas */
+    }
+
+    .year-label {
+        font-size: 20px;
+        color: #fff;
+    }
+
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Concours de visualisation DataGrandEst 2024 : Les EnR en Lumière</h1>
+        <p>De quelle manière les habitants de la région Grand-Est consomment-ils l'énergie renouvelable ? (de 2019 à 2022)</p>
+    </header>
+
+    <section class="map-section">
+        <div class="map-container" id="map1"></div>
+        <div class="panel right-panel">
+            <h1>Zoom sur la consommation des EPCI du Grand-Est en 2022 :</h1>
+            <div id="chart" class="chart-container"></div>
+            <div id="enr-chart" class="chart-container"></div>
+        </div>
+    </section>
+    
+ <section class="map-section">
+        <div class="panel left-panel" style="width: 15%;">
+            <h2 style="font-size: 20px">Visualisez la consommation annuels/habitants des EPCI d'un autre oeil !</h2>
+            <div id="slider-container">
+                <div class="year-labels">
+                    <div class="year-label">2022</div>
+                    <div class="year-label">2021</div>
+                    <div class="year-label">2020</div>
+                    <div class="year-label">2019</div>
+                </div>
+                <input type="range" min="2019" max="2022" step="1" value="2019" id="yearSlider" orient="vertical">
+            </div>
+        </div>
+        <div class="map-container" id="map2"></div>
+</section>
+
+<section class="map-section">
+    <div class="map-container" id="map3"></div> 
+</section>
+
+    <script>
+        
+//////////////// CONFIG DE LA 1ERE CARTE //////////////
+        
+        var map1 = L.map('map1', { zoomControl: false }).setView([48.7, 5.8], 8);
+        map1.scrollWheelZoom.disable();
+        map1.doubleClickZoom.disable();
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map1);
+
+        function getColor(d) {
+            return d > 155 ? '#004529' :
+                d > 81 ? '#006837' :
+                d > 51 ? '#31a354' :
+                d > 28 ? '#78c679' :
+                d > 5 ? '#c2e699' :
+                '#f7f7f7';
+        }
+
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({
+                weight: 3,
+                color: '#eee',
+                fillOpacity: 0.9
+            });
+            layer.bringToFront();
+        }
+
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+        }
+
+        var chartContainer = d3.select("#chart");
+        var margin = { top: 60, right: 20, bottom: 60, left: 60 };
+        var containerWidth = parseInt(chartContainer.style("width"));
+        var width = containerWidth - margin.left - margin.right;
+        var height = 300 - margin.top - margin.bottom;
+
+        var svg = chartContainer.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        var x = d3.scaleBand().range([0, width]).padding(0.1);
+        var y = d3.scaleLinear().range([height, 0]);
+
+        svg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", "translate(0," + height + ")");
+
+        svg.append("g")
+            .attr("class", "y-axis");
+        
+//// Premier graph //////
+        
+function updateChart(data) {
+    var colors = d3.scaleOrdinal(d3.schemeSet3);
+    x.domain(data.map(d => d.key));
+    y.domain([0, d3.max(data, d => d.value)]);
+    
+svg.selectAll(".chart-title").remove();
+
+ // Ajouter un titre centré avec saut de ligne
+svg.append("text")
+    .attr("x", width / 2)  // Centre le titre horizontalement
+    .attr("y", -30)        // Positionne le titre au-dessus du graphique
+    .attr("text-anchor", "middle") // Centre le texte autour du point x
+    .attr("class", "chart-title")
+    .style("fill", "white")
+    .style("font-size", "20px")
+    .html("Consommation en MegaWatt / Heure")
+    .append("tspan")
+    .attr("x", width / 2)
+    .attr("dy", "1.2em") // Décalage pour le tspan en dessous
+    .text("pour chaque type d'énergie");
+    
+    svg.select(".y-axis").selectAll("text").remove();
+
+    // Ajouter un titre à l'axe des ordonnées
+    svg.select(".y-axis")
+        .call(d3.axisLeft(y).ticks(5))
+        .selectAll("text")
+        .style("font-size", "14px");
+
+    svg.select(".y-axis")
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", -40)
+        .attr("x", -height / 2)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .style("fill", "white")
+        .style("font-family", "'Unistra A', Arial, sans-serif")
+        .text("Consommation en MW/h");
+    
+    var bars = svg.selectAll(".bar").data(data);
+    bars.enter()
+        .append("rect")
+        .attr("class", "bar")
+        .merge(bars)
+        .attr("x", d => x(d.key))
+        .attr("y", d => y(d.value))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - y(d.value))
+        .attr("fill", d => colors(d.key));
+
+    bars.exit().remove();
+
+    svg.select(".x-axis")
+        .call(d3.axisBottom(x).tickSize(0))
+        .selectAll("text")
+        .attr("transform", "rotate(-30)")
+        .style("text-anchor", "end")
+        .style("font-size", "16px")
+        .style("font-family", "'Unistra A', Arial, sans-serif");
+}
+
+        var svgEnr = d3.select("#enr-chart").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        var xEnr = d3.scaleBand()
+            .domain(["2019", "2020", "2021", "2022"])
+            .range([0, width])
+            .padding(0);
+
+        var yEnr = d3.scaleLinear().range([height, 0]);
+
+        svgEnr.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", "translate(0," + height + ")");
+
+        svgEnr.append("g")
+            .attr("class", "y-axis");
+
+        
+    ///////// Deuxième GRAPH ////////
+        
+ function updateEnRChart(data) {
+    yEnr.domain([0, d3.max(data)]);
+     
+     svgEnr.selectAll(".chart-title").remove();
+
+    // Ajouter un titre au graphique
+    svgEnr.append("text")
+        .attr("x", width / 2)
+        .attr("y", -20)
+        .attr("text-anchor", "middle")
+        .attr("class", "chart-title")
+        .style("font-size", "20px")
+        .style("fill", "white") 
+        .text("Ratio de la consommation EnR par habitant");
+
+    var greenScale = d3.scaleLinear().domain([0, data.length - 1]).range(["#d9f0a3", "#006837"]);
+
+    var bars = svgEnr.selectAll(".bar").data(data);
+
+    bars.enter()
+        .append("rect")
+        .attr("class", "bar")
+        .merge(bars)
+        .attr("x", (d, i) => xEnr(["2019", "2020", "2021", "2022"][i]))
+        .attr("y", d => yEnr(d))
+        .attr("width", xEnr.bandwidth())
+        .attr("height", d => height - yEnr(d))
+        .attr("fill", (d, i) => greenScale(i));
+
+    bars.exit().remove();
+     
+     svgEnr.select(".y-axis").selectAll("text").remove();
+
+    // Ajouter un titre à l'axe des ordonnées
+    svgEnr.select(".y-axis")
+        .call(d3.axisLeft(yEnr).ticks(5))
+        .selectAll("text")
+        .style("font-size", "14px");
+
+    svgEnr.select(".y-axis")
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", -40)
+        .attr("x", -height / 2)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .style("fill", "white")
+        .style("font-family", "'Unistra A', Arial, sans-serif")
+        .text("Ratio EnR en %");
+
+
+    svgEnr.select(".x-axis")
+        .call(d3.axisBottom(xEnr).tickSize(0))
+        .selectAll("text")
+        .style("font-size", "16px")
+        .style("font-family", "'Unistra A', Arial, sans-serif")
+}
+
+        function onEachFeature(feature, layer) {
+            layer.on('mouseover', function (e) {
+                highlightFeature(e);
+
+                var popupContent = `
+                    <b>Nom :</b> ${feature.properties.nom_complet}<br>
+                    <b>Nombre d'habitants :</b> ${feature.properties.pop}<br>
+                    <b>Ratio EnR :</b> ${feature.properties.R_EnR_2022} %
+                `;
+
+                var popup = L.popup({
+                    closeButton: false,
+                    offset: L.point(0, -20),
+                    maxWidth: 300,
+                    minWidth: 200
+                })
+                    .setLatLng(e.latlng)
+                    .setContent(popupContent)
+                    .openOn(map1);
+
+                var consumptionData = [
+                    { key: "Autres EnR", value: feature.properties.C_Autre_EnR || 0 },
+                    { key: "Non EnR", value: feature.properties.C_Autre_Non_EnR || 0 },
+                    { key: "Bois NRJ", value: feature.properties.C_Bois_NrJ || 0 },
+                    { key: "Chaleur/Froid", value: feature.properties.C_Chaleur_froid || 0 },
+                    { key: "CMS", value: feature.properties.CMS || 0 },
+                    { key: "Électricité", value: feature.properties.C_Electricite || 0 },
+                    { key: "Gaz Naturel", value: feature.properties.C_Gaz_naturel || 0 },
+                    { key: "Pétrole", value: feature.properties.C_prod_Petrol || 0 }
+                ];
+                updateChart(consumptionData);
+                updateEnRChart([
+                    feature.properties.R_EnR_2019 || 0,
+                    feature.properties.R_EnR_2020 || 0,
+                    feature.properties.R_EnR_2021 || 0,
+                    feature.properties.R_EnR_2022 || 0
+                ]);
+            });
+
+            layer.on('mouseout', function (e) {
+                resetHighlight(e);
+                map1.closePopup();
+            });
+        }
+
+        var geojsonLayer;
+        d3.json("Data/Carte1_final.geojson").then(function (data) {
+            geojsonLayer = L.geoJSON(data, {
+                style: function (feature) {
+                    return {
+                        fillColor: getColor(feature.properties.R_EnR_2022),
+                        weight: 1,
+                        color: 'black',
+                        fillOpacity: 0.7
+                    };
+                },
+                onEachFeature: onEachFeature
+            }).addTo(map1);
+        }).catch(function (error) {
+            console.error("Erreur de chargement du GeoJSON :", error);
+        });
+        
+//////////// Carte 2 //////////////
+        
+      // Configuration de la 2ème carte
+        var map2 = L.map('map2', { zoomControl: false }).setView([48.7, 5.8], 8);
+        map2.scrollWheelZoom.disable();
+        map2.doubleClickZoom.disable();
+
+        // Objets pour stocker les couches GeoJSON par année
+        var geojsonLayers = {
+            2019: null,
+            2020: null,
+            2021: null,
+            2022: null
+        };
+
+        // Fonction pour charger et afficher une couche GeoJSON pour une année spécifique
+        function loadLayer(year) {
+            if (geojsonLayers[year]) {
+                map2.addLayer(geojsonLayers[year]);
+            } else {
+                d3.json(`Data/${year}_conso_hab.geojson`).then(function (data) {
+                    geojsonLayers[year] = L.geoJSON(data, {
+                        style: function (feature) {
+                            return {
+                                fillColor: '#31aaba',
+                                color: 'black',
+                                weight: 1,
+                                fillOpacity: 0.7
+                            };
+                        }
+                    }).addTo(map2);
+                }).catch(function (error) {
+                    console.error(`Erreur de chargement du GeoJSON pour ${year}:`, error);
+                });
+            }
+        }
+
+        // Fonction pour mettre à jour la carte en affichant uniquement la couche pour l'année sélectionnée
+        function updateMap(year) {
+            Object.keys(geojsonLayers).forEach(function (yr) {
+                if (geojsonLayers[yr] && yr != year) {
+                    map2.removeLayer(geojsonLayers[yr]);
+                }
+            });
+            loadLayer(year);
+        }
+
+        // Écouteur pour le slider afin de mettre à jour la carte en fonction de l'année sélectionnée
+        document.getElementById("yearSlider").addEventListener("input", function () {
+            updateMap(this.value);
+        });
+
+        // Chargement initial pour l'année 2019
+        loadLayer(2019);
+        
+        
+///////////////// CARTE 3 /////////////////////
+        
+
+   //////////////////// CONFIG DE LA 3EME CARTE ////////////////////////////
+
+var map3 = L.map('map3', {
+    center: [48.7, 5.8], // Centrage de la carte
+    zoom: 8, // Niveau de zoom initial
+    zoomControl: false, // Désactive les contrôles de zoom
+    scrollWheelZoom: false // Désactive le zoom avec la molette de la souris
+});
+
+// Ajout des tuiles OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map3);
+
+// Fonction pour définir la couleur des zones en fonction de leur propriété (valeur CO2)
+function getCO2Color(d) {
+    if (d > 0) {
+        return '#FF0000'; // Rouge
+    } else {
+        var greenValue = Math.round((d + 55) * (255 / 55)); // Conversion en échelle de verts
+        return `rgb(0, ${greenValue}, 0)`; // Échelle de verts
+    }
+}
+
+// Style pour chaque entité GeoJSON
+function styleCO2(feature) {
+    return {
+        fillColor: getCO2Color(feature.properties.CO2),
+        weight: 1,
+        color: 'black',
+        fillOpacity: 0.7
+    };
+}
+
+// Fonction pour gérer les événements sur les entités GeoJSON
+function onEachCO2Feature(feature, layer) {
+    layer.on('mouseover', function (e) {
+        var popupContent = `
+            <b>Nom :</b> ${feature.properties.nom_complet}<br>
+            <b>Émissions CO2 :</b> ${feature.properties.CO2 || "Non spécifié"} tonnes
+        `;
+
+        var popup = L.popup({
+            closeButton: false,
+            offset: L.point(0, -20),
+            maxWidth: 300,
+            minWidth: 200
+        })
+            .setLatLng(e.latlng)
+            .setContent(popupContent)
+            .openOn(map3);
+    });
+
+    layer.on('mouseout', function () {
+        map3.closePopup();
+    });
+}
+
+// Chargement des données GeoJSON pour la troisième carte
+d3.json("Data/EPCI_CO2.geojson").then(function (data) {
+    L.geoJSON(data, {
+        style: styleCO2,
+        onEachFeature: onEachCO2Feature
+    }).addTo(map3);
+}).catch(function (error) {
+    console.error("Erreur de chargement du GeoJSON :", error);
+});
+
+// Création de la légende
+var legend = L.control({position: 'bottomright'});
+
+legend.onAdd = function (map3) {
+    var div = L.DomUtil.create('div', 'legend');
+    div.innerHTML = 
+        '<i style="background: #FF0000"></i> > 0 <br>' +
+        '<i style="background: rgb(0, 25, 0)"></i> -55 à -45 <br>' +
+        '<i style="background: rgb(0, 65, 0)"></i> -45 à -35 <br>' +
+        '<i style="background: rgb(0, 105, 0)"></i> -35 à -25 <br>' +
+        '<i style="background: rgb(0, 145, 0)"></i> -25 à -15 <br>' +
+        '<i style="background: rgb(0, 185, 0)"></i> -15 à -5 <br>' +
+        '<i style="background: rgb(0, 255, 0)"></i> -5 à 0 <br>';
+    return div;
+};
+
+legend.addTo(map3);
+
+// Ajout du titre de la carte avec un panneau derrière
+var title = L.control({position: 'topleft'});
+
+title.onAdd = function (map3) {
+    var div = L.DomUtil.create('div', 'title-panel');
+    div.innerHTML = '<h2>Évolution de l\'émission de CO2 lié à la consommation d\'énergie (2019-2022)</h2>';
+    return div;
+};
+
+title.addTo(map3);
+
+// Ajout du style CSS pour le panneau du titre
+var style = document.createElement('style');
+style.innerHTML = `
+    .title-panel {
+        background-color: #35abbd; /* Couleur de fond bleue */
+        color: white; /* Couleur du texte en blanc pour un bon contraste */
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Ombre pour un effet de profondeur */
+    }
+    .title-panel h2 {
+        margin: 0;
+        font-size: 1.5em;
+    }
+`;
+document.head.appendChild(style);
+
+
+
+             
+</script>
+        
+        
+        
+</body>
+
+</html>

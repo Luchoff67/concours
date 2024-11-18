@@ -1,0 +1,55 @@
+/* styles.css */
+
+/* Chargement de la police Unistra A */
+@font-face {
+    font-family: 'Unistra A';
+    src: url('Style/UnistraA-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Unistra A', Arial, sans-serif; /* Utilisation de la police Unistra A */
+    line-height: 1.6;
+    background-color: #bff1f2; /* Couleur de fond */
+}
+
+header {
+    background-color: #eee;
+    color: #fff;
+    padding: 35px;
+    text-align: left center;
+}
+
+.map-section {
+    display: flex;
+    margin: 10px 0;
+    height: 80vh;
+}
+
+.map-container {
+    flex: 3;
+    height: 100%;
+    background-color: #eee;
+}
+
+.panel {
+    padding: 20px;
+    background-color: #35abbd;
+    overflow-y: auto;
+    width: 20%;
+}
+
+.right-panel {
+    order: 2;
+}
+
+.left-panel {
+    order: -1;
+}
