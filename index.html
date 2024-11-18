@@ -541,7 +541,7 @@ function onEachCO2Feature(feature, layer) {
     layer.on('mouseover', function (e) {
         var popupContent = `
             <b>Nom :</b> ${feature.properties.nom_complet}<br>
-            <b>Émissions CO2 :</b> ${feature.properties.CO2 || "Non spécifié"} tonnes
+            <b>Variation Émissions CO2 :</b> ${feature.properties.CO2 || "Non spécifié"} %
         `;
 
         var popup = L.popup({
